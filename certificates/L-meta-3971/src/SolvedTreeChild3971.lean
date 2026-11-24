@@ -8,6 +8,6 @@ theorem solved_tree_child : ∀ C : PEqualNP.CircuitLowerBounds.Circuit, PEqualN
       let b := col 1
       s ++ [ite (g.op.eval [false]=true) (a.1,a.2+1) (a.1+b.1,a.2+b.2)]) init
     let z := ws.getD C.output (1,0)
-    z.2≤1 → z.1+z.2≤15 → ∃ r : Nat, r<512 ∧ C.eval ((([1,0,4,7,5,2,8,6,3] : List Nat).map (fun i => r.testBit i)) ++ [r.testBit 1 || r.testBit 8]) ≠ (13407807929942597095939831376727811673905304651018912648022854022873869787405066962725179222507908767667956533170508564710083788841651696458571261487544520 : Nat).testBit r := first_child_given3971 tree_lower
+    z.2≤1 → z.1+z.2≤15 → ∃ r : Nat, r<512 ∧ C.eval ((([1,0,4,7,5,2,8,6,3] : List Nat).map (fun i => r.testBit i)) ++ [r.testBit 1 || r.testBit 8]) ≠ (List.foldl (fun (a b : Nat) => a*1000000000000000000+b) 0 [13407807929,942597095939831376,727811673905304651,18912648022854022,873869787405066962,725179222507908767,667956533170508564,710083788841651696,458571261487544520] : Nat).testBit r := first_child_given3971 tree_lower
 #print axioms solved_tree_child
 end PetersenNegated3971
