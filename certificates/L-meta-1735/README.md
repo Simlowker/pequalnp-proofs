@@ -1,12 +1,24 @@
 # Residual edges of least top-form circuits
 
-This certificate proves three upper bounds toward desk step L-meta-1735. Let $s$ be the number of gates in a least, exact binary AND/OR circuit in top form for the graph-edge function. Let $U$ be the set of edges left after removing the pairs covered by opposite literal sides of a clean top AND. Assume the graph has girth at least five.
+This certificate gives partial upper bounds toward desk step L-meta-1735. Let $s$ be the number of gates in a least, exact binary AND/OR circuit in top form for the graph-edge function. Let $U$ be the set of edges left after removing the pairs covered by opposite literal sides of a clean top AND. Assume the graph has girth at least five.
 
 * If the circuit has $t$ dirty AND gates, then $|U| ≤ 4^t(s+1)$.
 * Let $q$ count the supported vertices whose signature occurs exactly once on the support. Then $|U| ≤ 2(s+1)+q^2$.
 * Since $q ≤ 4^t$, we also obtain $|U| ≤ 2(s+1)+16^t$. For instance, $q^2 ≤ s+1$ gives $|U| ≤ 3(s+1)$, even when the number of dirty AND gates grows.
 
-The exact Lean statement is `Simlowker.Types1735.girth_bounds` in [TypeBounds.lean](TypeBounds.lean). The requested uniform linear estimate for unrestricted circuits remains open.
+The Lean statement for these three bounds is `Simlowker.Types1735.girth_bounds` in [TypeBounds.lean](TypeBounds.lean). The requested uniform linear estimate for unrestricted circuits remains open.
+
+## Matching bounds
+
+Write $t$ for the number of dirty AND gates. The following results also count the residual edges when the number of dirty gates grows.
+
+* Every induced matching of residual edges has at most $2t$ edges. Here induced refers to the original graph, so extra edges between matching endpoints are forbidden even when those edges lie outside the residual set.
+* The residual edges admit a vertex cover of size at most $256t^2$. Every residual edge has an endpoint in this cover.
+* The edge count satisfies both $|U| ≤ 4ts$ and $|U| ≤ s+1+65536t^4$. In particular, $65536t^4 ≤ s+1$ implies $|U| ≤ 2(s+1)$.
+
+[LocalWitnesses.lean](LocalWitnesses.lean) proves the induced-matching bound. Each residual edge has an orientation with the following property. If an independent vertex set contains its first endpoint, some dirty operand in the accepting top’s cone contains its other endpoint among its literal inputs and misses the entire independent set. For each edge of an induced matching, take its first endpoint together with the second endpoints of all the other edges. This set is independent. The resulting dirty operand distinguishes that edge from every other edge of the matching, so the matching uses distinct operand slots.
+
+[MatchingBounds.lean](MatchingBounds.lean) proves the vertex-cover and edge-count bounds. In an ordinary matching, two edges conflict when the original graph has an edge between their endpoints. An independent set of this conflict graph is an induced matching. Turán’s theorem applied to the complement bounds how sparse the conflict graph can be. On the other hand, the girth bound limits the number of original edges among the matching endpoints. Together these inequalities bound an ordinary matching by $128t^2$. The endpoints of any maximal ordinary matching give the claimed vertex cover. Counting neighbors in that cover gives the fourth-power remainder.
 
 ## Why signatures control residual edges
 
@@ -33,10 +45,10 @@ lake env sh -eu -c '
   src=../certificates/L-meta-1735
   cache=$(mktemp -d)
   export LEAN_PATH="$cache:$LEAN_PATH"
-  for module in WideGates DegreeBounds TypeBounds; do
+  for module in WideGates DegreeBounds TypeBounds LocalWitnesses MatchingBounds; do
     lean -R "$src" -o "$cache/$module.olean" "$src/$module.lean"
   done
 '
 ```
 
-Each file prints the axioms for its main results. The printed list for `girth_bounds` contains `propext`, `Classical.choice`, and `Quot.sound`.
+Each file prints the axioms for its main results. The printed list for `girth_bounds` and `quartic_remainder` contains `propext`, `Classical.choice`, and `Quot.sound`.
