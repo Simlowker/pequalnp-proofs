@@ -8,6 +8,20 @@ This certificate gives partial upper bounds toward desk step L-meta-1735. Let $s
 
 The Lean statement for these three bounds is `Simlowker.Types1735.girth_bounds` in [TypeBounds.lean](TypeBounds.lean). The requested uniform linear estimate for unrestricted circuits remains open.
 
+## Nonnested dirty gates
+
+Suppose no dirty AND is a predecessor of another dirty AND. Let $Z$ contain the vertices that appear on a literal side of size one, two, or three at any dirty gate. A literal side is the set of inputs reachable from one operand by following OR wires downwards.
+
+* At most $8s$ residual edges have both endpoints outside $Z$.
+* If every nonempty literal side of a dirty gate has at least four vertices, then $|U| ≤ 8s$, regardless of the number of dirty gates or how many clean tops share them.
+* In general, $|U| ≤ 9s+1+|Z|^2$ under the nonnesting assumption.
+
+[FlatCircuits.lean](FlatCircuits.lean) proves these results. An accepting top has a certificate consisting of at most four OR wires. For each endpoint of an accepted pair, consider the certificate wires that see only the opposite endpoint. With at most two such wires, an independent-set substitution forces one of them to have at most one visible input outside that endpoint’s neighborhood. When a wire has at least four visible inputs, this near-containment identifies at most one possible neighbor center. Tracing the wire down to the first small operand bounds the number of edges that can be charged this way. A residual edge that escapes the charge must meet a small side of a dirty gate.
+
+## Bounded local cones
+
+[LocalCones.lean](LocalCones.lean) gives a separate linear bound for **all** graph edges when each clean top has at most $d$ distinct dirty predecessors connected by successive OR-only operand reads. Dirty gates may nest, and their total number may grow with circuit size. With $K=2(d+1)$ and $L=2^{K+1}$, the bound is $|E| ≤ (4L+(2KL)^2)s$. The proof uses an independent-transversal lemma for graphs without four-cycles. For a family of $k$ sets, each of size at least $2^{k-1}$ for $k ≥ 1$, one can select a vertex from each so that the selected vertices form an independent set. A vertex may serve more than one set.
+
 ## Matching bounds
 
 Write $t$ for the number of dirty AND gates. The following results also count the residual edges when the number of dirty gates grows.
@@ -45,10 +59,10 @@ lake env sh -eu -c '
   src=../certificates/L-meta-1735
   cache=$(mktemp -d)
   export LEAN_PATH="$cache:$LEAN_PATH"
-  for module in WideGates DegreeBounds TypeBounds LocalWitnesses MatchingBounds; do
+  for module in WideGates DegreeBounds TypeBounds LocalWitnesses MatchingBounds LocalCones FlatCircuits; do
     lean -R "$src" -o "$cache/$module.olean" "$src/$module.lean"
   done
 '
 ```
 
-Each file prints the axioms for its main results. The printed list for `girth_bounds` and `quartic_remainder` contains `propext`, `Classical.choice`, and `Quot.sound`.
+Each file prints the axioms for its main results. The printed list for `girth_bounds`, `quartic_remainder`, `bounded_local_gates`, and `no_thin_linear` contains `propext`, `Classical.choice`, and `Quot.sound`.
