@@ -35,3 +35,20 @@ From this branch's `lean` directory, with the project dependencies built, run
 ```sh
 lake env lean ../certificates/L-meta-16756/FormulaProfiles.lean
 ```
+
+## Circuits that can reuse gates
+
+Allowing reuse and NOT gates gives the same minimum of **10 gates**. The minimum remains ten if NOT gates are free and only AND and OR gates count. The circuit displayed above also has the minimum possible depth of **four levels**.
+
+The circuit lower bound in [CircuitOptimum.lean](CircuitOptimum.lean) uses Leg0shii's signed-gate certificate at the [parent commit](https://github.com/Leg0shii/pequalnp-proofs-fork/blob/ee7be5b7f994419a37bb8058773e90008efc7958/lean/PEqualNP/Outside/L_meta_16755.lean). The proof of that pull request exceeded the upstream checker's time limit. We replayed its source locally and used its lower bound with our ten-gate witness. [Depth.lean](Depth.lean) independently rules out depth three on nine explicit assignments, even when expressions may freely negate a subexpression.
+
+To replay all three theorems from the repository's `lean` directory, run
+
+```sh
+lake build PEqualNP.Outside.L_meta_16755
+certdir="$(cd ../certificates/L-meta-16756 && pwd)"
+outdir="$(mktemp -d)"
+lake env lean -R "$certdir" -o "$outdir/FormulaProfiles.olean" "$certdir/FormulaProfiles.lean"
+lake env lean -R "$certdir" -o "$outdir/Depth.olean" "$certdir/Depth.lean"
+lake env sh -c 'export LEAN_PATH="$1:$LEAN_PATH"; exec lean -R "$2" "$2/CircuitOptimum.lean"' sh "$outdir" "$certdir"
+```
