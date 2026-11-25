@@ -22,7 +22,7 @@ theorem balanced : optimal.size=7 ∧ optimal.depth 6=4 := by decide +kernel
 set_option maxRecDepth 16000 in
 theorem computes : ∀ x : Fin 6 → Bool,optimal.eval (List.ofFn x)=graph x := by decide +kernel
 
-theorem exact_size (s : Nat) : HasCircuitSize 6 graph s ↔ 7≤s := by
+theorem exact_size (s : Nat) : HasCircuitSize 6 graph s ↔ 7 ≤ s := by
   constructor
   · rintro ⟨C,h,sz,ev⟩
     have lb := circuitLower C.gates C.output h ev
