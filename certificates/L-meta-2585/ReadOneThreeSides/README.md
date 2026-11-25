@@ -1,12 +1,14 @@
 # Read-one incidence circuits
 
-For any rectangle-free point–line incidence graph with at most three points or at most three lines, every binary AND/OR circuit detecting a selected incidence admits a read-one replacement of at most the same size. The other side can have arbitrary finite size.
+For every rectangle-free point–line incidence graph whose incidences are covered by at most three vertices, each binary AND/OR circuit for detecting a selected incidence admits a read-one replacement of at most the same size. The covering vertices may be points, lines, or a mixture. Both parts of the graph may have arbitrary finite size.
 
-The theorem in `ReadOneThreeSides.lean` is a restricted result for the project assignment L-meta-2585. The full assignment allows both sides to have arbitrary size. For every prime implicant, read-one means that one accepting proof tree reads each variable of that implicant at most once.
+The theorem in `ThreeCenters2585.lean` is a restricted result for the project assignment L-meta-2585. The full assignment allows both sides to have arbitrary size. For every prime implicant, read-one means that one accepting proof tree reads each variable of that implicant at most once.
 
 The finite part checks all 512 incidence masks. Three representatives need explicit circuit lower bounds. They have masks 87, 94 and 238 in row-major bit order. Their minimum gate counts are 7, 7 and 8. The lower bounds use RUP certificates checked by the Lean kernel. The upper bounds follow by covering the edges with the three points.
 
 For arbitrary line count and three points, the proof classifies the possible column neighborhoods. Either two vertices cover every incidence, or three columns support a matching and all other occupied columns have degree one. Fixing those outside columns to false saves at least one gate per removed column. The retained 3-by-3 instance supplies the lower bound. Transposing handles the case of three lines.
+
+With a mixed cover consisting of a point and at most two lines, each other occupied line has exactly the same single neighbor. Retaining one such line and setting its twins to false saves at least one gate per deleted incidence. An optimal cover of the remaining graph can use their common point, extending to all the original edges at the same cover cost. Relabelling active lines and transposing the graph covers the remaining choices of three centers.
 
 ## Reproduce
 

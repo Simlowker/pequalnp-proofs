@@ -40,3 +40,6 @@ SelectCore2585
 AllThreeRows2585
 Transpose2585
 ReadOneThreeSides
+ActiveSide2585
+LeafTwins2585
+ThreeCenters2585
