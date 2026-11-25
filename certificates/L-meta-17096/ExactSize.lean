@@ -379,3 +379,181 @@ theorem free_negation_tree_optimum (k : ℕ) :
 
 #print axioms free_negation_tree_optimum
 end Simlowker.ThreeSun.FormulaBound
+
+-- Circuit unfolding adapted from the earlier Simlowker certificate for L-meta-12982.
+namespace Simlowker.ThreeSun.Depth
+open PEqualNP.CircuitLowerBounds PEqualNP.MetaComplexity PEqualNP.Outside.L_meta_17095 Simlowker.ThreeSun.FormulaBound
+inductive Expr where
+  | var (i : Fin 6)
+  | constant (c : Bool)
+  | neg (t : Expr)
+  | branch (andGate : Bool) (a b : Expr)
+  deriving Repr
+
+def Expr.dep : Expr → Nat
+  | .var _ | .constant _ => 0
+  | .neg t => t.dep
+  | .branch _ a b => max a.dep b.dep + 1
+def Expr.eval (x : Fin 6 → Bool) : Expr → Bool
+  | .var i => x i
+  | .constant c => c
+  | .neg a => !a.eval x
+  | .branch c a b => if c then a.eval x && b.eval x else a.eval x || b.eval x
+
+
+def Expr.asTree : Expr → BoolTree
+  | .var i => .atom ⟨i.val, by omega⟩
+  | .constant c => .atom (if c then 13 else 12)
+  | .neg t => .neg t.asTree
+  | .branch a l r => if a then .conj l.asTree r.asTree else .disj l.asTree r.asTree
+
+theorem asTree_eval (t : Expr) (x : Fin 6 → Bool) : t.asTree.eval x = t.eval x := by
+  induction t with
+  | var i => simp [Expr.asTree, BoolTree.eval, Expr.eval, vector, i.isLt]
+  | constant c => cases c <;> rfl
+  | neg t h => simp [Expr.asTree, BoolTree.eval, Expr.eval, h]
+  | branch c l r h j => cases c <;> simp [Expr.asTree, BoolTree.eval, Expr.eval, h, j]
+
+theorem tree_capacity (t : Expr) : t.asTree.binaryGates + 1 ≤ 2^t.dep := by
+  induction t with
+  | var _ => rfl
+  | constant c => cases c <;> rfl
+  | neg t h => exact h
+  | branch c l r hl hr =>
+    have lb : 2^l.dep ≤ (2:Nat)^(max l.dep r.dep) := Nat.pow_le_pow_right (by decide) (le_max_left _ _)
+    have rb : 2^r.dep ≤ (2:Nat)^(max l.dep r.dep) := Nat.pow_le_pow_right (by decide) (le_max_right _ _)
+    cases c <;> simp only [Expr.asTree, Bool.false_eq_true, ↓reduceIte, BoolTree.binaryGates, Expr.dep, pow_succ] <;> omega
+
+theorem expr_min_depth (t : Expr) (computes : ∀ x, t.eval x = posted x) : 4 ≤ t.dep := by
+  have bound := (free_negation_tree_optimum t.asTree.binaryGates).mp
+    ⟨t.asTree, le_rfl, fun x => (asTree_eval t x).trans (computes x)⟩
+  have size := tree_capacity t
+  by_contra! shallow
+  have := Nat.pow_le_pow_right (n:=2) (by decide) (show t.dep ≤ 3 by omega)
+  norm_num at this
+  omega
+abbrev Annot := Expr × Nat
+def dummy : Annot := (.constant false,0)
+def choose (o : GateOp) (es : List Expr) : Expr :=
+  match o, es with
+  | .and, [] => .constant true
+  | .or, [] => .constant false
+  | .and, [a] | .or, [a] => a
+  | .and, a::b::_ => .branch true a b
+  | .or, a::b::_ => .branch false a b
+  | .not, a::_ => .neg a
+  | .not, [] => .constant true
+  | _, _ => .constant false
+def make (o : GateOp) (ps : List Annot) : Annot :=
+  (choose o (ps.map Prod.fst), (ps.map Prod.snd).foldr max 0 + 1)
+def validOp (o : GateOp) := o = .and ∨ o = .or ∨ o = .not
+def readout (x : Fin 6 → Bool) (p : Annot) := p.1.eval x
+theorem gateEval (o : GateOp) (ps : List Annot) (x : Fin 6 → Bool) (op : validOp o) (arity : ps.length≤2) :
+    readout x (make o ps)=o.eval (ps.map (readout x)) := by
+  rcases op with rfl | rfl | rfl <;> rcases ps with _ | ⟨a,_|⟨b,_|⟨c,cs⟩⟩⟩ <;>
+    simp_all [make,choose,readout,Expr.eval,GateOp.eval]
+def safe (p : Annot) := p.1.dep ≤ p.2
+theorem gateSafe (o : GateOp) (ps : List Annot) (each : ∀ p ∈ ps,safe p) (op : validOp o) (arity : ps.length≤2) :
+    safe (make o ps) := by
+  rcases op with rfl | rfl | rfl <;> rcases ps with _ | ⟨a,_|⟨b,_|⟨c,cs⟩⟩⟩ <;>
+    simp_all [make,choose,safe,Expr.dep] <;> omega
+
+def reading (ps : List Annot) (g : Gate) := g.inputs.map fun i => ps.getD i dummy
+def step (ps : List Annot) (g : Gate) := ps ++ [make g.op (reading ps g)]
+def initial : List Annot := List.ofFn fun i : Fin 6 => (Expr.var i,0)
+def unfoldCircuit (C : Circuit) := (C.gates.foldl step initial).getD C.output dummy
+
+theorem traceMap {α : Type} (proj : Annot → α) (extend : List α → Gate → List α) (gs : List Gate)
+    (ok : ∀ g∈gs, validOp g.op ∧ g.inputs.length≤2)
+    (comm : ∀ ps g, validOp g.op → g.inputs.length≤2 → (step ps g).map proj=extend (ps.map proj) g)
+    (ps : List Annot) : (gs.foldl step ps).map proj=gs.foldl extend (ps.map proj) := by
+  induction gs generalizing ps with
+  | nil => rfl
+  | cons g gs ih =>
+    simp only [List.foldl_cons]
+    rw [ih (fun h hm => ok h (by simp [hm])),comm ps g (ok g (by simp)).1 (ok g (by simp)).2]
+
+theorem unfold_eval (C : Circuit) (h : FanInTwo C) (x : Fin 6 → Bool) :
+    (unfoldCircuit C).1.eval x=C.eval (List.ofFn x) := by
+  let f := fun (v : List Bool) (g : Gate) => v ++ [g.op.eval (g.inputs.map fun i => v.getD i false)]
+  have comm (ps : List Annot) (g : Gate) (op : validOp g.op) (ar : g.inputs.length≤2) :
+      (step ps g).map (readout x)= f (ps.map (readout x)) g := by
+    have e := gateEval g.op (reading ps g) x op (by simpa [reading] using ar)
+    have m (i : Nat) : (ps.map (readout x)).getD i false=readout x (ps.getD i dummy) :=
+      List.getD_map ps dummy (readout x)
+    simp only [step,f,List.map_append,List.map_cons,List.map_nil,e]
+    simp only [reading,List.map_map,Function.comp_def,m]
+  have t := traceMap (readout x) f C.gates h comm initial
+  have start : initial.map (readout x)=List.ofFn x := by simp [initial,readout,Expr.eval]
+  rw [start] at t
+  have out := congrArg (fun ps : List Bool => ps.getD C.output false) t
+  calc readout x (unfoldCircuit C) = ((C.gates.foldl step initial).map (readout x)).getD C.output false :=
+         (List.getD_map _ dummy (readout x)).symm
+       _ = C.eval (List.ofFn x) := out
+
+theorem unfold_depth (C : Circuit) (h : FanInTwo C) : (unfoldCircuit C).2=C.depth 6 := by
+  let f := fun (v : List Nat) (g : Gate) => v ++ [(g.inputs.map fun i => v.getD i 0).foldr max 0+1]
+  have comm (ps : List Annot) (g : Gate) (_ : validOp g.op) (_ : g.inputs.length≤2) :
+      (step ps g).map Prod.snd=f (ps.map Prod.snd) g := by
+    have m (i : Nat) : (ps.map Prod.snd).getD i 0=(ps.getD i dummy).2 := List.getD_map ps dummy Prod.snd
+    simp only [step,f,make,List.map_append,List.map_nil,List.map_cons,reading,List.map_map,Function.comp_def,m]
+  have t := traceMap Prod.snd f C.gates h comm initial
+  have start : initial.map Prod.snd=List.replicate 6 0 := by decide +kernel
+  rw [start] at t
+  calc (unfoldCircuit C).2 = ((C.gates.foldl step initial).map Prod.snd).getD C.output 0 :=
+         (List.getD_map _ dummy Prod.snd).symm
+       _ = C.depth 6 := congrArg (fun ps : List Nat => ps.getD C.output 0) t
+
+theorem readSafe (ps : List Annot) (all : ∀ p∈ps,safe p) (i : Nat) : safe (ps.getD i dummy) := by
+  by_cases h : i<ps.length
+  · rw [List.getD_eq_getElem _ _ h]; exact all _ (List.getElem_mem _)
+  · have hi : ps.length ≤ i := by omega
+    rw [List.getD_eq_default _ _ hi]
+    exact Nat.le_refl 0
+theorem traceSafe (gs : List Gate) (h : ∀ g∈gs,validOp g.op ∧ g.inputs.length≤2)
+    (ps : List Annot) (all : ∀ p∈ps,safe p) : ∀ p∈gs.foldl step ps,safe p := by
+  induction gs generalizing ps with
+  | nil => exact all
+  | cons g gs ih =>
+    apply ih (fun q hq => h q (by simp [hq]))
+    intro p hp
+    rcases List.mem_append.mp hp with old | new
+    · exact all p old
+    · obtain rfl := List.mem_singleton.mp new
+      apply gateSafe _ _ _ (h g (by simp)).1 (by simpa [reading] using (h g (by simp)).2)
+      intro s hs
+      obtain ⟨i,_,rfl⟩ := List.mem_map.mp hs
+      exact readSafe ps all i
+theorem circuit_depth_at_least_four (C : Circuit) (h : FanInTwo C)
+    (computes : ∀ x : Fin 6 → Bool,C.eval (List.ofFn x)=posted x) : 4≤C.depth 6 := by
+  have bound := expr_min_depth (unfoldCircuit C).1 fun x => (unfold_eval C h x).trans (computes x)
+  have safeInit : ∀ p∈initial,safe p := by
+    intro p hp
+    obtain ⟨i,rfl⟩ := List.mem_ofFn.mp hp
+    exact Nat.le_refl 0
+  have sound := readSafe _ (traceSafe C.gates h initial safeInit) C.output
+  exact (bound.trans sound).trans_eq (unfold_depth C h)
+
+def balanced : Circuit := ⟨[⟨.or, [1, 0]⟩,⟨.or, [5, 2]⟩,⟨.and, [6, 7]⟩,⟨.or, [2, 0]⟩,⟨.or, [4, 1]⟩,⟨.and, [9, 10]⟩,⟨.or, [8, 11]⟩,⟨.or, [2, 1]⟩,⟨.and, [13, 3]⟩,⟨.or, [12, 14]⟩],15⟩
+
+theorem balanced_shape : balanced.size=10 ∧ balanced.depth 6=4 := by decide +kernel
+theorem balanced_correct : ∀ x, balanced.eval (List.ofFn x)=posted x := by decide +kernel
+theorem balanced_legal : FanInTwo balanced := by
+  intro g hg
+  simp only [balanced, List.mem_cons, List.not_mem_nil, or_false] at hg
+  rcases hg with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp
+
+theorem minimum_depth (k : Nat) :
+    (∃ C : Circuit, FanInTwo C ∧ C.depth 6 ≤ k ∧ ∀ x, C.eval (List.ofFn x) = posted x) ↔ 4 ≤ k := by
+  constructor
+  · rintro ⟨C, legal, depth, computes⟩
+    exact (circuit_depth_at_least_four C legal computes).trans depth
+  · intro h
+    exact ⟨balanced, balanced_legal, balanced_shape.2.trans_le h, balanced_correct⟩
+#print axioms minimum_depth
+#print axioms circuit_depth_at_least_four
+#print axioms balanced_correct
+end Simlowker.ThreeSun.Depth
+
+open PEqualNP.CircuitLowerBounds in
+theorem Simlowker.ThreeSun.witness_depth : (Circuit.mk Simlowker.ThreeSun.witness 14).depth 6 = 5 := by decide +kernel
