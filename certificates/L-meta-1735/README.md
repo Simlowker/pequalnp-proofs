@@ -8,7 +8,17 @@ This certificate gives partial upper bounds toward desk step L-meta-1735. Let $s
 
 The Lean statement for these three bounds is `Simlowker.Types1735.girth_bounds` in [TypeBounds.lean](TypeBounds.lean). The requested uniform linear estimate for unrestricted circuits remains open.
 
-## Nonnested dirty gates
+## A factor of 542 for shallow accepting paths
+
+If no dirty AND feeds another dirty AND, a circuit of size $s$ has **at most $542s$ graph edges**. A dirty AND is a gate that can fire even when the active vertices contain no edge. The estimate applies to all edges and allows an arbitrary number of dirty gates and arbitrary sharing of wires. The graph only needs to have no four-cycle. The project's earlier proof by JLDC established this case with a larger constant, defined by the recurrence `budget 4 8`. The constant in that proof has 971 decimal digits. [Upstream proof L-meta-1880](https://github.com/open-goat/pequalnp-proofs/blob/1eda360769e0b50a6d2b17bafd86f6035ee34c64/lean/PEqualNP/Outside/L_meta_1880.lean#L522-L526)
+
+The same $542s$ bounds the number of edges that have at least one shallow accepting witness, even in a circuit containing nested dirty gates. In such a witness, the two endpoints activate a clean top AND. Each of its operands can be justified by tracing only OR wires to a literal or to a dirty AND whose two operands each see an active literal through OR wires. This definition allows different witnesses for different edges.
+
+For the remaining edges, the proof exhibits a clean top and two successive dirty ANDs, all active on the endpoint pair. An operand of the upper dirty AND sees neither endpoint through OR wires and is supplied by the lower dirty AND. If a set $D$ contains every graph edge with such a witness, then $|E| ≤ 542s + |D|$. Controlling those additional edges uniformly is the open part of this argument. [Lean statements](FlatBound.lean) · [Nested case L-meta-1882](https://pequalnp.com/lemma.html#L-meta-1882)
+
+The count uses four finite sets of pairs. Broad literal inputs contribute at most $32s$. A dirty AND with two small literal sides contributes at most $225s$ across all such gates. A vertex on a small side of a dirty gate can also be recorded with the large set that must be activated along with it. Absence of four-cycles limits how many vertices across a clean top can be compatible with seven or more distinct such labels. Charging to the first small wire gives at most $60s$ pairs. Tops with two small sets of labels contribute at most $225s$. The union bound gives $32+225+60+225=542$. [Counting lemmas](GuardedInputs.lean)
+
+## Sharper estimates for some nonnested circuits
 
 Suppose no dirty AND is a predecessor of another dirty AND. Let $Z$ contain the vertices that appear on a literal side of size one, two, or three at any dirty gate. A literal side is the set of inputs reachable from one operand by following OR wires downwards.
 
@@ -59,10 +69,10 @@ lake env sh -eu -c '
   src=../certificates/L-meta-1735
   cache=$(mktemp -d)
   export LEAN_PATH="$cache:$LEAN_PATH"
-  for module in WideGates DegreeBounds TypeBounds LocalWitnesses MatchingBounds LocalCones FlatCircuits; do
+  for module in WideGates DegreeBounds TypeBounds LocalWitnesses MatchingBounds LocalCones FlatCircuits GuardedInputs FlatBound; do
     lean -R "$src" -o "$cache/$module.olean" "$src/$module.lean"
   done
 '
 ```
 
-Each file prints the axioms for its main results. The printed list for `girth_bounds`, `quartic_remainder`, `bounded_local_gates`, and `no_thin_linear` contains `propext`, `Classical.choice`, and `Quot.sound`.
+Each file prints the axioms for its main results. The printed list for `girth_bounds`, `quartic_remainder`, `bounded_local_gates`, `no_thin_linear`, `shallow_pairs_bound`, `nested_remainder`, and `flat_edge_bound` contains `propext`, `Classical.choice`, and `Quot.sound`.
