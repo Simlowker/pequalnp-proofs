@@ -8,6 +8,16 @@ This certificate gives partial upper bounds toward desk step L-meta-1735. Let $s
 
 The Lean statement for these three bounds is `Simlowker.Types1735.girth_bounds` in [TypeBounds.lean](TypeBounds.lean). The requested uniform linear estimate for unrestricted circuits remains open.
 
+## Bounded repetitions in nested circuits
+
+Consider any exact binary AND/OR circuit for the edge function of a graph without four-cycles. Enable just the endpoints of one edge. To justify the true output, follow one true child at each OR and both children at each AND, unfolding a shared wire each time it is used. Count the leaves with repetitions. If every edge has some such tree with at most $K$ leaves, then $|E| ≤ f(K)s$, where $f(K)$ is explicit and independent of the graph and the circuit. The same bound applies to the subset of edges with such a tree, even when every remaining edge needs a larger tree. A tree with at most $d$ nested ANDs on each path has at most $2^d$ leaves. [TreeBounds.lean](TreeBounds.lean)
+
+This yields a bound in the project's official READ-$r$ model. A joint witness for an edge reads each endpoint at most $r$ times in the same tree, hence has at most $2r$ leaves. Every exact READ-$r$ circuit therefore satisfies $|E| ≤ f(2r)s$ for any fixed $r$, with arbitrary AND nesting and wire sharing. If more edges are present, there is an adjacent pair for which both orders of the project's capped count-vector test fail. A uniform conversion to bounded read multiplicity with any fixed size overhead would suffice for the full residual-edge target. Whether that conversion exists remains open. [ReadBounds.lean](ReadBounds.lean) · [Project definition of READ-$r$](https://github.com/open-goat/pequalnp-proofs/blob/3a6fb91512ff77bffc0a5b66c481b3e63df67fa2/lean/PEqualNP/Defs/ReadK.lean) · [Jukna's definition](https://arxiv.org/abs/2207.08701)
+
+At each wire the proof retains representative independent sets for each possible tree size up to $K$. The two operands of an AND split the leaf budget. If the pair has escaped the edges already counted, representatives for the two operands can be chosen so their union remains independent after deleting the tested edge. At the output such a representative would activate the circuit on an independent set, contradicting soundness. Write $R=\mathrm{budget}(K,2K)$ for JLDC's representative-family bound and $b=2(K+1)RK$. This proof gives $f(K)=b(b+b^2)$. The earlier $542s$ estimate below gives a smaller constant on its restricted class.
+
+The project already proved the read-3 incidence bound for projective planes. The results above quantify over all read thresholds and all simple graphs without four-cycles. They use the representative-family and deleted-edge lemmas from JLDC's L-meta-1880 and the project's count-vector fold lemmas. [Prior projective-plane result](https://github.com/open-goat/pequalnp-proofs/blob/105221e56179c6649851cfdf0aac8b0db23316b8/lean/PEqualNP/Outside/L_meta_2581.lean) · [Representative-family proof](https://github.com/open-goat/pequalnp-proofs/blob/1eda360769e0b50a6d2b17bafd86f6035ee34c64/lean/PEqualNP/Outside/L_meta_1880.lean)
+
 ## A factor of 542 for shallow accepting paths
 
 If no dirty AND feeds another dirty AND, a circuit of size $s$ has **at most $542s$ graph edges**. A dirty AND is a gate that can fire even when the active vertices contain no edge. The estimate applies to all edges and allows an arbitrary number of dirty gates and arbitrary sharing of wires. The graph only needs to have no four-cycle. The project's earlier proof by JLDC established this case with a larger constant, defined by the recurrence `budget 4 8`. The constant in that proof has 971 decimal digits. [Upstream proof L-meta-1880](https://github.com/open-goat/pequalnp-proofs/blob/1eda360769e0b50a6d2b17bafd86f6035ee34c64/lean/PEqualNP/Outside/L_meta_1880.lean#L522-L526)
@@ -60,19 +70,19 @@ Two distinct vertices have at most one common neighbor in a graph without four-c
 
 ## Replaying the certificate
 
-The parent project revision is `3a6fb91512ff77bffc0a5b66c481b3e63df67fa2`. The certificate imports the project's definitions and two merged proofs, L-meta-1506 for circuit evaluation through OR wires and L-meta-2074 for the support bound. Use the checkout's pinned Lean toolchain and Mathlib dependencies. From the repository root:
+The parent project revision is `3a6fb91512ff77bffc0a5b66c481b3e63df67fa2`. The certificate imports the project's definitions and the project's count-vector fold lemmas. It also imports three merged proofs, L-meta-1506 for OR-wire evaluation, L-meta-2074 for the support bound, and L-meta-1880 for representative families. Use the checkout's pinned Lean toolchain and Mathlib dependencies. From the repository root:
 
 ```sh
 cd lean
-lake build +PEqualNP.Outside.L_meta_1506 +PEqualNP.Outside.L_meta_2074
+lake build +PEqualNP.Outside.L_meta_1506 +PEqualNP.Outside.L_meta_2074 +PEqualNP.Outside.L_meta_1880 +PEqualNP.MetaComplexity.Helpers.ReadTwoBridge
 lake env sh -eu -c '
   src=../certificates/L-meta-1735
   cache=$(mktemp -d)
   export LEAN_PATH="$cache:$LEAN_PATH"
-  for module in WideGates DegreeBounds TypeBounds LocalWitnesses MatchingBounds LocalCones FlatCircuits GuardedInputs FlatBound; do
+  for module in WideGates DegreeBounds TypeBounds LocalWitnesses MatchingBounds LocalCones FlatCircuits GuardedInputs FlatBound TreeBounds ReadBounds; do
     lean -R "$src" -o "$cache/$module.olean" "$src/$module.lean"
   done
 '
 ```
 
-Each file prints the axioms for its main results. The printed list for `girth_bounds`, `quartic_remainder`, `bounded_local_gates`, `no_thin_linear`, `shallow_pairs_bound`, `nested_remainder`, and `flat_edge_bound` contains `propext`, `Classical.choice`, and `Quot.sound`.
+Each file prints the axioms for its main results. The printed list for `girth_bounds`, `quartic_remainder`, `bounded_local_gates`, `no_thin_linear`, `shallow_pairs_bound`, `nested_remainder`, `flat_edge_bound`, `tree_edge_bound`, `read_k_bound`, and `replacement_suffices` contains `propext`, `Classical.choice`, and `Quot.sound`.
